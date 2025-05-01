@@ -1,15 +1,17 @@
+# producers.py
 from kafka import KafkaProducer
 import json
+import os
 from pika import BlockingConnection, ConnectionParameters, PlainCredentials
+from urllib.parse import urlparse
 
 # Kafka producer
 def send_message_to_kafka(message: str):
+    bootstrap_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'kafka:9092')
     producer = KafkaProducer(
-        bootstrap_servers='kafka:9092',
+        bootstrap_servers=bootstrap_servers,
         value_serializer=lambda v: json.dumps(v).encode('utf-8')
     )
-    
-    # Send message as a dictionary (key: 'message', value: message)
     producer.send('test-topic', {'message': message})
     producer.flush()
     print(f"Message sent to Kafka: {message}")
@@ -17,17 +19,19 @@ def send_message_to_kafka(message: str):
 
 # RabbitMQ producer
 def send_message_to_rabbitmq(message: str):
+    rabbit_url = os.getenv('RABBITMQ_URL', 'amqp://guest:guest@rabbitmq:5672/')
+    parsed = urlparse(rabbit_url)
+    credentials = PlainCredentials(parsed.username, parsed.password)
     connection = BlockingConnection(ConnectionParameters(
-        host='rabbitmq',
-        credentials=PlainCredentials('guest', 'guest')
+        host=parsed.hostname,
+        port=parsed.port,
+        virtual_host=parsed.path[1:] if parsed.path else '/',
+        credentials=credentials
     ))
     channel = connection.channel()
-    
-    # Declare the queue and send the message
     channel.queue_declare(queue='test-queue')
     channel.basic_publish(exchange='',
                           routing_key='test-queue',
-                          body=json.dumps({"message": message}))  # Send as a JSON object
-    
+                          body=json.dumps({"message": message}))
     print(f"Message sent to RabbitMQ: {message}")
     connection.close()

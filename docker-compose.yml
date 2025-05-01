@@ -1,16 +1,19 @@
-version: '3.9'
-
+# docker-compose.yml
 services:
   fastapi-app:
     build: .
     ports:
       - "8000:8000"
     depends_on:
-      - kafka
-      - rabbitmq
+      kafka:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - RABBITMQ_URL=amqp://rabbitmq:5672/
+      - KAFKA_CONSUMER_RETRIES=5
+      - KAFKA_CONSUMER_RETRY_DELAY=5
     restart: on-failure
     healthcheck:
       test: ["CMD", "curl", "--silent", "--fail", "http://localhost:8000/health"]
@@ -37,11 +40,9 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL: PLAINTEXT
-      KAFKA_LISTENER_NAME: PLAINTEXT
-      KAFKA_LISTENER_PORT: 9092
-      KAFKA_LISTENER_HOSTNAME: kafka
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     restart: on-failure
     healthcheck:
