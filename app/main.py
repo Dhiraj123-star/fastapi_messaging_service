@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from .producer import send_message_to_kafka, send_message_to_rabbitmq
 from .consumer import kafka_listener
+from .rabbit_consumer import rabbitmq_listener
 import threading
 
 app = FastAPI()
@@ -11,19 +12,25 @@ app = FastAPI()
 class MessageRequest(BaseModel):
     message: str
 
+
 @app.on_event("startup")
 def startup_event():
-    print("Starting Kafka listener thread...")
-    
-    def thread_target():
+    print("Starting Kafka and RabbitMQ listener threads...")
+
+    def run_kafka():
         try:
             kafka_listener()
         except Exception as e:
-            print(f"Kafka listener thread crashed: {e}")
-    
-    # Start the Kafka listener in a separate thread
-    thread = threading.Thread(target=thread_target, daemon=True)
-    thread.start()
+            print(f"Kafka listener crashed: {e}")
+
+    def run_rabbit():
+        try:
+            rabbitmq_listener()
+        except Exception as e:
+            print(f"RabbitMQ listener crashed: {e}")
+
+    threading.Thread(target=run_kafka, daemon=True).start()
+    threading.Thread(target=run_rabbit, daemon=True).start()
 
 @app.get("/")
 def read_root():
